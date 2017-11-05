@@ -14,12 +14,14 @@ import (
 	"github.com/steffen25/golang.zone/repositories"
 	"github.com/steffen25/golang.zone/services"
 	"github.com/steffen25/golang.zone/util"
+	"log"
 )
 
 type PostController struct {
 	*app.App
 	repositories.PostRepository
 	repositories.UserRepository
+	repositories.CategoryRepository
 }
 
 type PostPaginator struct {
@@ -35,8 +37,11 @@ type PostPaginator struct {
 	PrevPageUrl  *string `json:"prevPageUrl"`
 }
 
-func NewPostController(a *app.App, pr repositories.PostRepository, ur repositories.UserRepository) *PostController {
-	return &PostController{a, pr, ur}
+func NewPostController(a *app.App,
+	pr repositories.PostRepository,
+	ur repositories.UserRepository,
+	cr repositories.CategoryRepository) *PostController {
+	return &PostController{a, pr, ur, cr}
 }
 
 func (pc *PostController) GetAll(w http.ResponseWriter, r *http.Request) {
@@ -136,6 +141,12 @@ func (pc *PostController) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, err := pc.UserRepository.FindById(uid)
+	if err != nil {
+		NewAPIError(&APIError{false, "could not find user", http.StatusBadRequest}, w)
+		return
+	}
+
 	j, err := GetJSON(r.Body)
 	if err != nil {
 		NewAPIError(&APIError{false, "Invalid request", http.StatusBadRequest}, w)
@@ -167,6 +178,17 @@ func (pc *PostController) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	catId, err := j.GetInt("categoryId")
+	cat := &models.Category{}
+	if err == nil {
+		category, err := pc.CategoryRepository.FindById(catId)
+		if err != nil {
+			NewAPIError(&APIError{false, "Could not find category", http.StatusBadRequest}, w)
+			return
+		}
+		cat = category
+	}
+
 	body = util.CleanZalgoText(body)
 
 	if len(body) < 10 {
@@ -179,22 +201,28 @@ func (pc *PostController) Create(w http.ResponseWriter, r *http.Request) {
 		Slug:      slug,
 		Body:      body,
 		CreatedAt: time.Now(),
-		UserID:    uid,
+		Author:    user,
+		Category:  nil,
+	}
+
+	if cat.ID != 0 {
+		post.Category = cat
 	}
 
 	err = pc.PostRepository.Create(post)
 	if err != nil {
+		log.Println(err)
 		NewAPIError(&APIError{false, "Could not create post", http.StatusBadRequest}, w)
 		return
 	}
 
 	// TODO: Change this maybe put the user object into a context and get the author from there.
-	u, err := pc.UserRepository.FindById(uid)
-	if err != nil {
-		NewAPIError(&APIError{false, "Content is required", http.StatusBadRequest}, w)
-		return
-	}
-	post.Author = u.Name
+	//u, err := pc.UserRepository.FindById(uid)
+	//if err != nil {
+	//	NewAPIError(&APIError{false, "Content is required", http.StatusBadRequest}, w)
+	//	return
+	//}
+	//post.Author = u.Name
 
 	defer r.Body.Close()
 	NewAPIResponse(&APIResponse{Success: true, Message: "Post created", Data: post}, w, http.StatusOK)
@@ -206,6 +234,13 @@ func (pc *PostController) Update(w http.ResponseWriter, r *http.Request) {
 		NewAPIError(&APIError{false, "Something went wrong", http.StatusInternalServerError}, w)
 		return
 	}
+
+	user, err := pc.UserRepository.FindById(uid)
+	if err != nil {
+		NewAPIError(&APIError{false, "could not find user", http.StatusBadRequest}, w)
+		return
+	}
+
 	vars := mux.Vars(r)
 	postId, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -225,6 +260,20 @@ func (pc *PostController) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	catId, err := j.GetInt("categoryId")
+	if err != nil {
+		NewAPIError(&APIError{false, "Category is required", http.StatusBadRequest}, w)
+		return
+	}
+
+	category, err := pc.CategoryRepository.FindById(catId)
+	if err != nil {
+		NewAPIError(&APIError{false, "Could not find category", http.StatusBadRequest}, w)
+		return
+	}
+
+	post.Category = category
+
 	title, err := j.GetString("title")
 	if err != nil {
 		NewAPIError(&APIError{false, "Title is required", http.StatusBadRequest}, w)
@@ -257,7 +306,7 @@ func (pc *PostController) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post.UserID = uid
+	post.Author = user
 	post.UpdatedAt = mysql.NullTime{Time: time.Now(), Valid: true}
 	post.Title = title
 	post.Body = body

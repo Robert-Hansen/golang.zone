@@ -14,6 +14,7 @@ import (
 type App struct {
 	Config   config.Config
 	Database *database.MySQLDB
+	GormDB   *database.GormMySQLDB
 	Redis    *database.RedisDB
 }
 
@@ -22,12 +23,16 @@ func New(cfg config.Config) *App {
 	if err != nil {
 		log.Fatal(err)
 	}
+	gormdb, err := database.NewGormMySQLDB(cfg.MySQL)
+	if err != nil {
+		log.Fatal(err)
+	}
 	redis, err := database.NewRedisDB(cfg.Redis)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return &App{cfg, db, redis}
+	return &App{cfg, db, gormdb, redis}
 }
 
 func (a *App) Run(r *mux.Router) {

@@ -17,6 +17,7 @@ func NewRouter(a *app.App) *mux.Router {
 	// Repositories
 	ur := repositories.NewUserRespository(a.Database)
 	pr := repositories.NewPostRepository(a.Database)
+	cr := repositories.NewCategoryRepository(a.Database)
 
 	// Services
 	jwtAuth := services.NewJWTAuthService(&a.Config.JWT, a.Redis)
@@ -24,7 +25,8 @@ func NewRouter(a *app.App) *mux.Router {
 	// Controllers
 	ac := controllers.NewAuthController(a, ur, jwtAuth)
 	uc := controllers.NewUserController(a, ur, pr)
-	pc := controllers.NewPostController(a, pr, ur)
+	pc := controllers.NewPostController(a, pr, ur, cr)
+	cc := controllers.NewCategoryController(a, cr)
 	uploadController := controllers.NewUploadController()
 
 	r.HandleFunc("/", middlewares.Logger(uc.HelloWorld)).Methods(http.MethodGet)
@@ -47,6 +49,13 @@ func NewRouter(a *app.App) *mux.Router {
 	api.HandleFunc("/posts/{slug}", middlewares.Logger(pc.GetBySlug)).Methods(http.MethodGet)
 	api.HandleFunc("/posts", middlewares.Logger(middlewares.RequireAuthentication(a, pc.Create, true))).Methods(http.MethodPost)
 	api.HandleFunc("/posts/{id}", middlewares.Logger(middlewares.RequireAuthentication(a, pc.Update, true))).Methods(http.MethodPut)
+
+	// Categories
+	api.HandleFunc("/categories", middlewares.Logger(cc.GetAll)).Methods(http.MethodGet)
+	api.HandleFunc("/categories/{id:[0-9]+}", middlewares.Logger(cc.GetById)).Methods(http.MethodGet)
+	api.HandleFunc("/categories/{name}", middlewares.Logger(cc.GetByName)).Methods(http.MethodGet)
+	api.HandleFunc("/categories", middlewares.Logger(middlewares.RequireAuthentication(a, cc.Create, true))).Methods(http.MethodPost)
+	api.HandleFunc("/categories/{id}", middlewares.Logger(middlewares.RequireAuthentication(a, cc.Update, true))).Methods(http.MethodPut)
 
 	// Authentication
 	auth := api.PathPrefix("/auth").Subrouter()

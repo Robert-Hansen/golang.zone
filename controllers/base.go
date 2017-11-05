@@ -127,9 +127,12 @@ func (d *JsonData) GetInt(key string) (int, error) {
 	keys := d.data
 	err := errors.New("Could not find key: " + key)
 	if v, ok := keys[key]; ok {
-		return v.(int), nil
+		intVal, err := v.(json.Number).Int64()
+		if err != nil {
+			return -1, err
+		}
+		return int(intVal), nil
 	}
-
 	return -1, err
 }
 

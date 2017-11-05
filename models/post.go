@@ -11,10 +11,10 @@ type Post struct {
 	Title     string         `json:"title"`
 	Slug      string         `json:"slug"`
 	Body      string         `json:"body"`
-	UserID    int            `json:"userId"`
-	Author    string         `json:"author,omitempty"`
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt mysql.NullTime `json:"updatedAt"`
+	Author    *User          `json:"author"`
+	Category  *Category      `json:"category"`
 }
 
 func (p *Post) MarshalJSON() ([]byte, error) {
@@ -25,11 +25,19 @@ func (p *Post) MarshalJSON() ([]byte, error) {
 			Title     string          `json:"title"`
 			Slug      string          `json:"slug"`
 			Body      string          `json:"body"`
-			UserID    int             `json:"userId"`
-			Author    string          `json:"author"`
 			CreatedAt time.Time       `json:"createdAt"`
 			UpdatedAt *mysql.NullTime `json:"updatedAt"`
-		}{p.ID, p.Title, p.Slug, p.Body, p.UserID, p.Author, p.CreatedAt, nil})
+			Author    *User           `json:"author"`
+			Category  *Category       `json:"category"`
+		}{p.ID,
+			p.Title,
+			p.Slug,
+			p.Body,
+			p.CreatedAt,
+			nil,
+			p.Author,
+			p.Category,
+		})
 	}
 
 	return json.Marshal(struct {
@@ -37,9 +45,17 @@ func (p *Post) MarshalJSON() ([]byte, error) {
 		Title     string    `json:"title"`
 		Slug      string    `json:"slug"`
 		Body      string    `json:"body"`
-		UserID    int       `json:"userId"`
-		Author    string    `json:"author"`
 		CreatedAt time.Time `json:"createdAt"`
 		UpdatedAt time.Time `json:"updatedAt"`
-	}{p.ID, p.Title, p.Slug, p.Body, p.UserID, p.Author, p.CreatedAt, p.UpdatedAt.Time})
+		Author    *User     `json:"author"`
+		Category  *Category `json:"category"`
+	}{p.ID,
+		p.Title,
+		p.Slug,
+		p.Body,
+		p.CreatedAt,
+		p.UpdatedAt.Time,
+		p.Author,
+		p.Category,
+	})
 }
